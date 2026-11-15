@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  verify:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run verification test suites (5 suites + clean-tree assertion)
+        run: |
+          make verify-darwin
+
+      - name: Verify package installation and CLI entrypoints
+        run: |
+          pip install --upgrade pip
+          pip install .
+          aegis-controller --help
+          aegis-proxy --help
+          aegis-cli --help
+          aegis-bpf-bridge --help
+          aegis-dashboard --help
+          aegis-run --help
