@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aegis-zero"
+version = "0.4.0"
+description = "Autonomous Execution Guard, Intent Sentinel & Zero-Trust AI Agent Containment System"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Aegis-Zero Contributors" }
+]
+keywords = [
+    "security",
+    "ai-safety",
+    "ebpf",
+    "lsm",
+    "agent-containment",
+    "byzantine-fault-tolerance",
+    "zero-trust",
+    "sandboxing",
+    "merkle-tree",
+    "ed25519"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = []
+
+[project.optional-dependencies]
+semantic = [
+    "sentence-transformers>=2.2.0"
+]
+crypto = [
+    "cryptography>=41.0.0"
+]
+dev = [
+    "pytest>=7.0.0"
+]
+
+[project.scripts]
+aegis-controller = "aegis_controller:main"
+aegis-proxy = "aegis_proxy:main"
+aegis-cli = "aegis_cli:main"
+aegis-bpf-bridge = "aegis_bpf_bridge:main"
+aegis-dashboard = "aegis_dashboard:main"
+aegis-run = "aegis_run:main"
+
+[tool.setuptools]
+py-modules = [
+    "aegis_controller",
+    "aegis_proxy",
+    "aegis_cli",
+    "aegis_bpf_bridge",
+    "aegis_dashboard",
+    "aegis_run",
+]

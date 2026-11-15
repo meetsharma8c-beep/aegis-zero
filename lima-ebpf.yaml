@@ -1,0 +1,46 @@
+# Lima VM for building and verifier-testing aegis_kernel_hook.bpf.c
+#   limactl start --name=aegis-ebpf lima-ebpf.yaml && limactl restart aegis-ebpf
+#   limactl shell --workdir "$PWD" aegis-ebpf -- make vmlinux build-bpf verify-bpf
+# Ubuntu 24.04 ships kernel 6.8 with CONFIG_BPF_LSM=y and BTF; only the lsm= list must be extended.
+vmType: vz
+cpus: 4
+memory: "4GiB"
+disk: "20GiB"
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+mounts:
+  - location: "~/Downloads/Aegis-Zero"
+    writable: true
+containerd:
+  system: false
+  user: false
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y --no-install-recommends \
+        clang llvm libbpf-dev make gcc python3 pahole \
+        "linux-headers-$(uname -r)" "linux-tools-$(uname -r)" linux-tools-common linux-tools-generic
+      # cloud images override GRUB_CMDLINE_LINUX_DEFAULT in grub.d; a later-sorted drop-in wins.
+      cat > /etc/default/grub.d/99-aegis-bpf-lsm.cfg <<'EOF'
+      GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} lsm=lockdown,capability,landlock,yama,integrity,apparmor,bpf"
+      EOF
+      update-grub
+      mkdir -p /sys/fs/cgroup/aegis_sandbox || true
+      echo "Provisioned. Reboot (limactl restart aegis-ebpf) to activate BPF LSM."
+probes:
+  - description: "BPF toolchain installed"
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      command -v clang && command -v bpftool
+    hint: "provisioning still running; see /var/log/cloud-init-output.log"
+message: |
+  BPF LSM active after reboot? run:  cat /sys/kernel/security/lsm   (must contain ",bpf")
+  Build + verify:  limactl shell --workdir {{.Dir}} aegis-ebpf -- make vmlinux build-bpf verify-bpf
