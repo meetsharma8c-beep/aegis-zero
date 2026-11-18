@@ -141,12 +141,18 @@ def main() -> int:
     if c3 != 200:
         return 1
 
-    # Step 4: write_file(path="tainted.txt", content="tainted write") -> expects 403 (held and denied)
-    c4, r4 = rpc_call("write_file", {"path": "tainted.txt", "content": "tainted write"}, 4)
-    if c4 == 403:
-        return 0
+    # Step 4: tainted overwrite of data.txt -> frozen (SIGSTOP) in the hold queue, operator
+    # issues a signed CoW rollback and then denies -> expects 403
+    c4, r4 = rpc_call("write_file", {"path": "data.txt", "content": "POISONED BY RAG"}, 4)
+    if c4 != 403:
+        return 1
 
-    return 1
+    # Step 5: verify the sandbox was rolled back to its pre-session state
+    sandbox = os.environ.get("AEGIS_SANDBOX_DIR", ".")
+    with open(os.path.join(sandbox, "data.txt"), encoding="utf-8") as fh:
+        restored = fh.read() == "test data\\n"
+    summary_gone = not os.path.exists(os.path.join(sandbox, "summary.txt"))
+    return 0 if (restored and summary_gone) else 2
 
 
 if __name__ == "__main__":
@@ -395,9 +401,15 @@ def run_self_test(ns: argparse.Namespace) -> int:
                 pending_received = True
                 pending_id = pending["id"]
                 ac.log("SELF-TEST", f"Observed pending request {pending_id} (verdict={pending.get('verdict')})")
+                frozen_state = {p: ac.process_state(p) for p in pending.get("frozen_pids", [])}
+                was_frozen = bool(frozen_state) and all(s.startswith("T") for s in frozen_state.values())
+                summary_mid = (workdir / "summary.txt").exists()
+                rb = op.rollback()
+                rolled_back = bool(rb.get("ok")) and len(rb.get("restored", [])) >= 1
+                ac.log("SELF-TEST", f"frozen={frozen_state} rollback ok={rb.get('ok')} restored={rb.get('restored')}")
                 rep = op.decide(pending_id, "deny")
-                denied_ok = bool(rep.get("ok"))
-                ac.log("SELF-TEST", f"Operator denied {pending_id}: ok={denied_ok}")
+                denied_ok = bool(rep.get("ok")) and was_frozen and summary_mid and rolled_back
+                ac.log("SELF-TEST", f"Operator denied {pending_id}: ok={rep.get('ok')}")
         except Exception as e:
             ac.log("SELF-TEST", f"Error during pending wait/decision: {e}")
 
@@ -412,16 +424,18 @@ def run_self_test(ns: argparse.Namespace) -> int:
         summary_file = workdir / "summary.txt"
         tainted_file = workdir / "tainted.txt"
 
-        r1_ok = summary_file.exists() and summary_file.read_text(encoding="utf-8") == "summary of data"
+        restored = (data_file.read_text(encoding="utf-8") == "test data\n" and not summary_file.exists()
+                    and not tainted_file.exists())
+        r1_ok = pending_received  # agent only reaches the held call after aligned read+write returned 200
         r2_ok = (ctl.taint.tau.name == "TAINTED")
-        r3_ok = (pending_received and denied_ok and child.returncode == 0 and not tainted_file.exists())
-        r4_ok = (child.returncode == 0)
+        r3_ok = (pending_received and denied_ok)
+        r4_ok = (child.returncode == 0 and restored and ctl.cow.verify_chain())
 
         results = [
-            ("R1: Agent aligned read succeeded", r1_ok, f"summary.txt exists: {summary_file.exists()}"),
+            ("R1: Aligned read+write forwarded (200)", r1_ok, f"agent reached step 4: {pending_received}"),
             ("R2: Session was tainted", r2_ok, f"tau={ctl.taint.tau.name}"),
-            ("R3: Tainted write was held and denied", r3_ok, f"held={pending_received} denied={denied_ok}"),
-            ("R4: Agent exited cleanly", r4_ok, f"rc={child.returncode}"),
+            ("R3: Tainted write frozen, rollback+deny", r3_ok, f"held={pending_received} ok={denied_ok}"),
+            ("R4: Pre-session state restored, rc=0", r4_ok, f"rc={child.returncode} restored={restored}"),
         ]
 
         # 16. Print results R1..R4 PASS/FAIL, clean up, exit 0/1

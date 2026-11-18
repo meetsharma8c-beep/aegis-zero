@@ -314,7 +314,7 @@ A drop-in launcher that wraps any arbitrary AI agent execution under full zero-t
   5. Injects containment environment variables (`AEGIS_PROXY_URL`, `AEGIS_SANDBOX_DIR`, `AEGIS_OOB_SOCKET`).
   6. Automatically registers the root agent PID with the process tree freezer.
   7. Supervises execution, handles signal forwarding, and guarantees clean teardown on exit.
-- **Self-Test Verification (`--self-test`):** Spawns a real multi-step autonomous agent subprocess performing file reads, writes, and external RAG ingest. Confirms that tainted writes freeze the agent via `SIGSTOP`, alerts the operator, denies unaligned egress, and completes cleanly with exit code 0.
+- **Self-Test Verification (`--self-test`):** Spawns a real multi-step autonomous agent subprocess performing file reads, writes, and external RAG ingest. Confirms that tainted writes freeze the agent via `SIGSTOP`, the operator issues a signed CoW rollback and a deny, and the agent itself verifies the sandbox is back to its pre-session state before exiting 0.
 
 ### Packaging & Continuous Integration
 - **`pyproject.toml`:** Standard PEP 621 package configuration defining metadata, optional extras (`semantic`, `crypto`, `dev`), and 6 console script entrypoints:

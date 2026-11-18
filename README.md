@@ -2,7 +2,7 @@
 
 **Autonomous Execution Guard, Intent Sentinel & Zero-Trust Runtime Control Plane**: contains AI agents as untrusted, possibly Byzantine OS processes.
 
-![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-38%2F38%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-39%2F39%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 ## Architecture
 
@@ -77,17 +77,17 @@ sudo python3 aegis_bpf_bridge.py --run --intent "..." --cgroup /sys/fs/cgroup/ae
 
 ## Verification (`make verify-darwin`)
 
-Running `make verify-darwin` executes the complete verification suite spanning 5 modules and 38 assertions, followed by a strict zero-leftover-artifacts workspace audit:
+Running `make verify-darwin` executes the complete verification suite spanning 5 modules and 39 assertions, followed by a strict zero-leftover-artifacts workspace audit:
 
 | Suite | Target | Tests | Assertions / Verifications | Result |
 |---|---|---|---|---|
 | **Controller** | `test-controller` | 10 | K0 Ed25519 RFC 8032 KAT, T0 real SIGSTOP tree freeze, S1 TOCTOU symlink swap, S2 poisoned RAG exfil chain, S3 canary trip, S4 stego canonicalizer, S5 benign workflow, S6 CoW Merkle WAL & rollback, K1 proxy-heap memory dump forgery resistance, Intent calibration | 10/10 PASS |
 | **L7 Proxy** | `test-proxy` | 10 | E1–E10 over live HTTP and Unix socket: hold, approve, deny, kill, fail-closed timeout, live signed rollback | 10/10 PASS |
 | **BPF Bridge** | `test-bridge` | 10 | B1 C struct layouts, B2 enums, B3 `dev_t` encoding, B4 ringbuf wrap/discard/busy, B5 map bytes, B6 event → freeze + challenge, B7 live maps | 10/10 PASS |
-| **SOC Dashboard** | `test-dashboard` | 4 | D1 HTML5 SOC UI delivery, D2 JSON telemetry stream, D3 hold-and-release decision via API, D4 transactional rollback via API | 4/4 PASS |
-| **Universal Runner** | `test-runner` | 4 | R1 Aligned tool execution, R2 Taint propagation, R3 Dynamic freezing + operator deny, R4 Clean agent exit | 4/4 PASS |
+| **SOC Dashboard** | `test-dashboard` | 5 | D1 HTML5 SOC UI delivery, D2 JSON telemetry stream, D3 signed approve via API, D4 signed deny of frozen egress (403), D5 transactional rollback via API | 5/5 PASS |
+| **Universal Runner** | `test-runner` | 4 | R1 aligned read+write (200), R2 taint propagation, R3 real SIGSTOP freeze + signed rollback + deny, R4 agent verifies pre-session state restored, exits 0 | 4/4 PASS |
 
-**Total: 38/38 PASS, 0 workspace artifacts.**
+**Total: 39/39 PASS, 0 workspace artifacts.**
 
 Intent calibration: aligned actions score $D_{cos} \le 0.220$ and unaligned actions score $D_{cos} \ge 0.990$.
 

