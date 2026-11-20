@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aegis-zero"
-version = "0.4.0"
+version = "0.5.0"
 description = "Autonomous Execution Guard, Intent Sentinel & Zero-Trust AI Agent Containment System"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -59,6 +59,9 @@ aegis-cli = "aegis_cli:main"
 aegis-bpf-bridge = "aegis_bpf_bridge:main"
 aegis-dashboard = "aegis_dashboard:main"
 aegis-run = "aegis_run:main"
+aegis-db-guard = "aegis_db_guard:main"
+aegis-swarm = "aegis_swarm:main"
+aegis-forensics = "aegis_forensics:main"
 
 [tool.setuptools]
 py-modules = [
@@ -68,4 +71,7 @@ py-modules = [
     "aegis_bpf_bridge",
     "aegis_dashboard",
     "aegis_run",
+    "aegis_db_guard",
+    "aegis_swarm",
+    "aegis_forensics",
 ]
