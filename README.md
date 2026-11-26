@@ -2,7 +2,7 @@
 
 **Autonomous Execution Guard, Intent Sentinel & Zero-Trust Runtime Control Plane**: contains AI agents as untrusted, possibly Byzantine OS processes.
 
-![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-50%2F50%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-68%2F68%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 ## Architecture
 
@@ -35,6 +35,23 @@ flowchart LR
 | [`aegis_db_guard.py`](aegis_db_guard.py) | `AegisDBGuard`: wraps a `sqlite3` connection. Each write runs in `SAVEPOINT aegis_sp_<n>`; exceeding `max_rows` or a non-ALLOW verdict rolls the savepoint back and freezes the agent. `_aegis_canary_row` in SQL or results is a CANARY_TRIP. |
 | [`aegis_swarm.py`](aegis_swarm.py) | `SwarmCoordinator`: one controller per agent, grants attenuated to `Grants(U0) ∩ Grants(sub_intent)`. `relay_message` canonicalises messages (stego → freeze sender) and propagates taint `τ_to ⊔ τ_from` plus lineage. |
 | [`aegis_forensics.py`](aegis_forensics.py) | `ForensicExporter`: Ed25519-signed canonical JSON incident bundles (state, decision, full WAL chain, OWASP LLM01/LLM06 + NIST AI RMF tags). `verify_bundle` checks the signature, every WAL link from genesis, and the Merkle root. CLI: `--verify bundle.json`. |
+
+### Phase 6: MCP stdio, live pipeline wiring, benchmark
+
+**Native MCP stdio proxy** — wrap any stdio MCP server for Claude Desktop / Cursor / Cline:
+```bash
+python3 aegis_mcp_stdio.py --intent "summarize report.md and write summary.md" --workdir ./sandbox \
+        -- npx -y @modelcontextprotocol/server-filesystem ./sandbox
+```
+Example client config (`mcpServers` entry): `"command": "python3", "args": ["/path/aegis_mcp_stdio.py", "--intent", "...", "--", "<server cmd>", "..."]`.
+Every `tools/call` is evaluated; blocked calls freeze the server tree, raise an OOB challenge (approve from `aegis_cli.py` or `aegis_dashboard.py`) and return JSON-RPC error `-32001`. Logs go to stderr only, so stdout framing is never corrupted.
+
+**Live pipeline wiring (`aegis_proxy.py`)**:
+- `sql_query` / `sql_exec` run inside an `AegisDBGuard` sandbox DB (`--db-path`, default in-memory, honey row installed); the signed `rollback` command also calls `rollback_all()`.
+- `send_to_agent` is relayed through `SwarmCoordinator.relay_message()` (taint + lineage inheritance).
+- Every `DENY` / `CANARY_TRIP` auto-exports a signed incident bundle to `/tmp/aegis_forensics_<uid>/` (`--keep-forensics` to retain); the path is in the OOB `pending` message as `forensic_bundle`. Bundles are signed with a per-session **proxy attestation key** (`proxy.forensic_pub`), never the operator key, so Ring 1 still holds no operator secret.
+
+**Benchmark** — `python3 -B aegis_benchmark.py --write-doc` regenerates [BENCHMARK.md](BENCHMARK.md) (TPR/FPR and P50/P95/P99 per component).
 
 The full formal model, threat matrix and protocol specs are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -85,20 +102,22 @@ sudo python3 aegis_bpf_bridge.py --run --intent "..." --cgroup /sys/fs/cgroup/ae
 
 ## Verification (`make verify-darwin`)
 
-Running `make verify-darwin` executes the complete verification suite spanning 8 modules and 50 assertions, followed by a strict zero-leftover-artifacts workspace audit:
+Running `make verify-darwin` executes the complete verification suite spanning 10 modules and 68 assertions, followed by a strict zero-leftover-artifacts workspace audit:
 
 | Suite | Target | Tests | Assertions / Verifications | Result |
 |---|---|---|---|---|
 | **Controller** | `test-controller` | 10 | K0 Ed25519 RFC 8032 KAT, T0 real SIGSTOP tree freeze, S1 TOCTOU symlink swap, S2 poisoned RAG exfil chain, S3 canary trip, S4 stego canonicalizer, S5 benign workflow, S6 CoW Merkle WAL & rollback, K1 proxy-heap memory dump forgery resistance, Intent calibration | 10/10 PASS |
-| **L7 Proxy** | `test-proxy` | 10 | E1–E10 over live HTTP and Unix socket: hold, approve, deny, kill, fail-closed timeout, live signed rollback | 10/10 PASS |
+| **L7 Proxy** | `test-proxy` | 11 | E1–E10 over live HTTP and Unix socket: hold, approve, deny, kill, fail-closed timeout, live signed rollback; E11 SQL honey row through the live proxy → trip + verified forensic bundle | 11/11 PASS |
 | **BPF Bridge** | `test-bridge` | 10 | B1 C struct layouts, B2 enums, B3 `dev_t` encoding, B4 ringbuf wrap/discard/busy, B5 map bytes, B6 event → freeze + challenge, B7 live maps | 10/10 PASS |
 | **SOC Dashboard** | `test-dashboard` | 5 | D1 HTML5 SOC UI delivery, D2 JSON telemetry stream, D3 signed approve via API, D4 signed deny of frozen egress (403), D5 transactional rollback via API | 5/5 PASS |
 | **Universal Runner** | `test-runner` | 4 | R1 aligned read+write (200), R2 taint propagation, R3 real SIGSTOP freeze + signed rollback + deny, R4 agent verifies pre-session state restored, exits 0 | 4/4 PASS |
 | **DB Guard** | `test-dbguard` | 3 | DB1 aligned SELECT + 1-row UPDATE, DB2 mass UPDATE → `ROLLBACK TO SAVEPOINT` + freeze (0 rows changed), DB3 honey-row SELECT → CANARY_TRIP + freeze | 3/3 PASS |
 | **Swarm** | `test-swarm` | 3 | SW1 taint A→B then B's write escalates + freezes, SW2 `Grants(U0) ∩ Grants(sub)` blocks delegated `http_post` (D > 0.75), SW3 stego inter-agent message freezes sender | 3/3 PASS |
 | **Forensics** | `test-forensics` | 5 | F1 write + canary trip, F2 signed bundle verifies, F3 1-char tamper rejected, F4 re-signed WAL forgery rejected, F5 wrong key rejected | 5/5 PASS |
+| **MCP stdio** | `test-mcp` | 6 | M1 initialize/tools/list pass-through, M2 aligned `read_file`, M3 `rag_search` taints, M4 tainted `write_file` → `-32001` + server `SIGSTOP`, M5 framing intact + thaw, M6 clean EOF exit | 6/6 PASS |
+| **Benchmark** | `test-benchmark` | 1 | 16 cases (6 benign, 10 adversarial), asserts TPR = 100% and FPR = 0% — see [BENCHMARK.md](BENCHMARK.md) | 1/1 PASS |
 
-**Total: 50/50 PASS, 0 workspace artifacts.**
+**Total: 68/68 PASS, 0 workspace artifacts.**
 
 Intent calibration: aligned actions score $D_{cos} \le 0.220$ and unaligned actions score $D_{cos} \ge 0.990$.
 

@@ -43,17 +43,27 @@ class SwarmAgent:
 
 
 class SwarmCoordinator:
-    def __init__(self, root_intent_u0: str, canary_dir: Path, operator_key: bytes, workdir: Path):
+    def __init__(self, root_intent_u0: str, canary_dir: Path, operator_key: bytes, workdir: Path,
+                 freezer: ProcessTreeFreezer | None = None):
         self.u0, self.canary_dir, self.pub, self.workdir = root_intent_u0, canary_dir, operator_key, workdir
-        self.freezer = ProcessTreeFreezer()
+        self.freezer = freezer or ProcessTreeFreezer()
         self.canon = Canonicalizer()
         self.agents: dict[str, SwarmAgent] = {}
         self.messages: list[dict] = []
 
+    def adopt(self, name: str, pid: int, ctl: AegisController) -> SwarmAgent:
+        """Register an existing (already-contained) controller as a swarm member without re-attenuating it."""
+        if pid > 0:
+            self.freezer.register(pid)
+        ag = SwarmAgent(name, pid, ctl.u0, ctl)
+        self.agents[name] = ag
+        return ag
+
     def register_agent(self, name: str, pid: int, sub_intent: str) -> SwarmAgent:
         ctl = AegisController(sub_intent, self.canary_dir, self.pub, self.workdir, self.freezer)
         ctl.intent = AttenuatedIntentVerifier(self.u0)
-        self.freezer.register(pid)
+        if pid > 0:  # virtual peers (pid 0) are never signalled
+            self.freezer.register(pid)
         ag = SwarmAgent(name, pid, sub_intent, ctl)
         self.agents[name] = ag
         ac.log("SWARM", f"agent {name} pid={pid} grants={sorted(self.effective_grants(name))}")

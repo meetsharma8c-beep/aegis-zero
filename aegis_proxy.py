@@ -23,8 +23,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import aegis_controller as ac
-from aegis_controller import (Action, AegisController, Priv, ProcessTreeFreezer, Verdict, default_canary_dir,
+from aegis_controller import (Action, AegisController, Ed25519, Priv, ProcessTreeFreezer, Verdict, default_canary_dir,
                               ensure_operator_keypair, load_operator_pubkey, register_cleanup)
+import sqlite3
+from aegis_db_guard import CANARY as DB_CANARY, AegisDBGuard
+from aegis_forensics import ForensicExporter
+from aegis_swarm import SwarmCoordinator
+
+SQL_TOOLS = ("sql_query", "sql_exec")
 
 DEFAULT_SOCK = "/tmp/aegis_oob.sock"
 SEC_ERR = -32001
@@ -60,10 +66,12 @@ class Pending:
     token: str | None = None
     stage: str | None = None
     created: float = field(default_factory=time.time)
+    forensic_bundle: str | None = None
 
     def view(self) -> dict:
         return {"id": self.id, "verdict": self.decision.verdict, "frozen_pids": self.decision.frozen_pids,
-                "payload": self.decision.payload, "age_s": round(time.time() - self.created, 1)}
+                "payload": self.decision.payload, "age_s": round(time.time() - self.created, 1),
+                "forensic_bundle": self.forensic_bundle}
 
 
 class OOBServer:
@@ -143,18 +151,62 @@ class OOBServer:
 
 class AegisProxy:
     def __init__(self, ctl: AegisController, upstream: str, agent_pid: int, hold_timeout: float,
-                 on_timeout: str, sock_path: str):
+                 on_timeout: str, sock_path: str, db_path: str | None = ":memory:", forensics: bool = True,
+                 keep_forensics: bool = False):
         self.ctl, self.upstream, self.agent_pid = ctl, upstream.rstrip("/"), agent_pid
         self.hold_timeout, self.on_timeout = hold_timeout, on_timeout
         self.pending: dict[str, Pending] = {}
         self.lock = threading.Lock()
         if agent_pid > 0:
             ctl.freezer.register(agent_pid)
+        # Phase 5 engines wired into live traffic
+        self.db_lock, self.db_guard = threading.Lock(), None
+        if db_path:
+            conn = sqlite3.connect(db_path, check_same_thread=False)
+            conn.execute("CREATE TABLE IF NOT EXISTS aegis_honey (id TEXT PRIMARY KEY, data TEXT)")
+            conn.commit()
+            self.db_guard = AegisDBGuard(conn, ctl)
+            if not conn.execute("SELECT 1 FROM aegis_honey WHERE id = ?", (DB_CANARY,)).fetchone():
+                self.db_guard.install_canary("aegis_honey")
+        self.swarm = SwarmCoordinator(ctl.u0, ctl.canary.root, ctl.gate.pub, ctl.workdir, ctl.freezer)
+        self.swarm.adopt("self", agent_pid, ctl)
+        self.swarm_lock = threading.Lock()
+        self.forensics = ForensicExporter() if forensics else None
+        # bundles are signed by a per-session proxy attestation key: the operator private key never enters Ring 1
+        self.forensic_seed = secrets.token_bytes(32)
+        self.forensic_pub = Ed25519.public_from_seed(self.forensic_seed)
+        self.forensic_dir = Path("/tmp") / f"aegis_forensics_{os.getuid()}"
+        if forensics:
+            self.forensic_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if not keep_forensics:
+                register_cleanup(self.forensic_dir)
         self.oob = OOBServer(sock_path, self)
 
     def set_agent(self, pid: int) -> None:
         self.agent_pid = pid
         self.ctl.freezer.register(pid)
+        self.swarm.agents["self"].pid = pid
+
+    def peer(self, uri: str) -> str:
+        with self.swarm_lock:
+            if uri not in self.swarm.agents:
+                self.swarm.register_agent(uri, 0, self.ctl.u0)
+        return uri
+
+    @staticmethod
+    def sql_result(rpc_id, rows: list) -> dict:
+        rows = [list(r) for r in rows]
+        return {"jsonrpc": "2.0", "id": rpc_id,
+                "result": {"content": [{"type": "text", "text": json.dumps(rows, default=str)}], "rows": rows}}
+
+    def export_incident(self, rid: str, dec: ac.Decision) -> str | None:
+        path = self.forensic_dir / f"incident_{time.strftime('%Y%m%dT%H%M%S')}_{rid}.json"
+        try:
+            self.forensics.export_bundle(self.ctl, dec, path, self.forensic_seed)
+        except OSError as e:
+            ac.log("FORENSICS", f"export failed: {e}")
+            return None
+        return str(path)
 
     def telemetry(self) -> dict:
         t = self.ctl.telemetry()
@@ -174,6 +226,9 @@ class AegisProxy:
                 ac.log("OOB-HITL", "rollback command REJECTED (bad/stale/replayed signature)")
                 return {"ok": False, "error": "rollback signature invalid, stale or replayed"}
             restored = self.ctl.rollback()
+            if self.db_guard is not None:
+                with self.db_lock:
+                    self.db_guard.rollback_all()
             self.oob.broadcast({"type": "rollback", "data": {"restored": restored,
                                                              "merkle_root": self.ctl.cow.merkle_root()}})
             return {"ok": True, "restored": restored, "merkle_root": self.ctl.cow.merkle_root()}
@@ -230,11 +285,28 @@ class AegisProxy:
         a = to_action(self.agent_pid, name, args)
         clean, _ = self.ctl.canon.scrub_args(a.args)
         body = {"jsonrpc": "2.0", "id": rpc_id, "method": "tools/call", "params": {"name": name, "arguments": clean}}
-        dec = self.ctl.evaluate(a)
-        if dec.verdict == Verdict.ALLOW:
-            return self.release(a, dec.token, body, rpc_id, dec.stage)
+        sql = name in SQL_TOOLS and self.db_guard is not None
+        q, params = str(args.get("query", "")), tuple(args.get("params") or ())
+        if sql:  # SQL never reaches upstream: it runs in the savepoint-guarded sandbox DB
+            with self.db_lock:
+                dec = self.db_guard.execute(a.pid, q, params)
+                rows = list(self.db_guard.last_rows)
+            if dec.verdict == Verdict.ALLOW:
+                return 200, self.sql_result(rpc_id, rows)
+        else:
+            dec = self.ctl.evaluate(a)
+            if dec.verdict == Verdict.ALLOW and name == "send_to_agent":
+                with self.swarm_lock:
+                    rel = self.swarm.relay_message("self", self.peer(str(args.get("agent", "agent://peer"))),
+                                                   str(args.get("message", "")))
+                if rel.verdict != Verdict.ALLOW:
+                    return 403, self.sec_error(rpc_id, f"AEGIS: {rel.reason}", {"tool": name, "verdict": rel.verdict})
+            if dec.verdict == Verdict.ALLOW:
+                return self.release(a, dec.token, body, rpc_id, dec.stage)
         rid = secrets.token_hex(4)
         p = Pending(rid, a, dec, rpc_id)
+        if self.forensics is not None and dec.verdict in (Verdict.TRIP, Verdict.DENY):
+            p.forensic_bundle = self.export_incident(rid, dec)
         with self.lock:
             self.pending[rid] = p
         ac.log("HOLD", f"{rid}: {dec.verdict} {name}({a.target}) held; agent frozen={dec.frozen_pids}")
@@ -253,6 +325,11 @@ class AegisProxy:
             ac.log("HOLD", f"{rid}: no operator decision in {self.hold_timeout}s -> DENY ({self.on_timeout})")
         self.oob.broadcast({"type": "resolved", "data": {"id": rid, "outcome": p.outcome}})
         if p.outcome == "approved":
+            if sql:
+                with self.db_lock:
+                    cur = self.db_guard.conn.execute(q, params)
+                    rows = cur.fetchall() if cur.description else []
+                return 200, self.sql_result(rpc_id, rows)
             return self.release(a, p.token, body, rpc_id, p.stage)
         return 403, self.sec_error(rpc_id, f"AEGIS: action {p.outcome}",
                                    {"request_id": rid, "verdict": dec.verdict, "reason": dec.reason, "risk": dec.risk})
@@ -473,8 +550,22 @@ def run_demo(port: int, sock_path: str, canary_dir: Path) -> int:
     tel = proxy.telemetry()
     results.append(("E9 telemetry stream", "taint" in op.telemetry and tel["pending"] == [], f"taint={tel['taint']} tokens={tel['active_tokens']}"))
 
+    # E11: Phase 5 wiring: SQL honey row through the live proxy -> trip + signed forensic bundle
+    agent3 = ac.spawn_agent(); proxy.set_agent(agent3.pid)
+    while not op.events.empty():  # discard stale events left by the E8 timeout path
+        op.events.get_nowait()
+    t, box, p = held("sql_query", {"query": f"SELECT * FROM aegis_honey WHERE id = '{DB_CANARY}'"})
+    bundle = p.get("forensic_bundle")
+    ok_b, why_b = ForensicExporter.verify_bundle(Path(bundle), proxy.forensic_pub) if bundle else (False, "no bundle")
+    dk = op.decide(p["id"], "deny", kill=True)
+    t.join(10)
+    c, r = box["r"]
+    agent3.wait(5)
+    results.append(("E11 SQL honey row -> trip + forensic bundle", c == 403 and p["verdict"] == Verdict.TRIP and ok_b
+                    and dk["ok"] and agent3.returncode is not None, why_b))
+
     op.close(); srv.shutdown(); up.shutdown(); proxy.oob.close()
-    for pr in (agent, agent2):
+    for pr in (agent, agent2, agent3):
         for x in ac.descendants(pr.pid):
             try: os.kill(x, 9)
             except ProcessLookupError: pass
@@ -498,6 +589,8 @@ def main() -> int:
     ap.add_argument("--on-timeout", choices=["kill", "thaw"], default="kill")
     ap.add_argument("--keep-canaries", action="store_true")
     ap.add_argument("--key-dir", type=Path, default=None, help="dir holding operator_ed25519.pub (public key only)")
+    ap.add_argument("--db-path", default=":memory:", help="sqlite sandbox DB for sql_query/sql_exec (guarded)")
+    ap.add_argument("--keep-forensics", action="store_true", help="keep /tmp/aegis_forensics_<uid> on exit")
     ap.add_argument("--demo", action="store_true", help="run the automated live end-to-end test")
     ns = ap.parse_args()
     ac.KEEP_CANARIES = ns.keep_canaries
@@ -507,7 +600,8 @@ def main() -> int:
         ap.error("--intent is required (unless --demo)")
     register_cleanup(ns.canary_dir)
     ctl = AegisController(ns.intent, ns.canary_dir, load_operator_pubkey(ns.key_dir), ns.workdir.resolve())
-    proxy = AegisProxy(ctl, ns.upstream, ns.agent_pid, ns.hold_timeout, ns.on_timeout, ns.socket)
+    proxy = AegisProxy(ctl, ns.upstream, ns.agent_pid, ns.hold_timeout, ns.on_timeout, ns.socket,
+                       db_path=ns.db_path, keep_forensics=ns.keep_forensics)
     srv = ThreadingHTTPServer((ns.host, ns.port), ProxyHandler)
     srv.daemon_threads = True
     srv.proxy = proxy  # type: ignore[attr-defined]

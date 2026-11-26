@@ -8,11 +8,11 @@ BPFTOOL   ?= bpftool
 ARCH      := $(shell uname -m | sed -e 's/x86_64/x86/' -e 's/aarch64/arm64/' -e 's/arm64/arm64/')
 BPF_OBJ   := aegis_kernel_hook.bpf.o
 PIN_DIR   := /sys/fs/bpf/aegis
-AEGIS_TMP := /tmp/aegis_canaries_* /tmp/aegis_cow_* /tmp/aegis_work_* /tmp/aegis_demo_* /tmp/aegis_keys_* /tmp/aegis_bridge_* /tmp/aegis_oob.sock /tmp/aegis_dashboard_* /tmp/aegis_run_* /tmp/aegis_dbguard_* /tmp/aegis_swarm_* /tmp/aegis_forensics_*
+AEGIS_TMP := /tmp/aegis_canaries_* /tmp/aegis_cow_* /tmp/aegis_work_* /tmp/aegis_demo_* /tmp/aegis_keys_* /tmp/aegis_bridge_* /tmp/aegis_oob.sock /tmp/aegis_dashboard_* /tmp/aegis_run_* /tmp/aegis_dbguard_* /tmp/aegis_swarm_* /tmp/aegis_forensics_* /tmp/aegis_mcp_* /tmp/aegis_bench_*
 LIMA_VM   ?= aegis-ebpf
 
 .PHONY: all vmlinux build-bpf verify-bpf unload-bpf verify-darwin test-controller test-proxy test-bridge \
-        test-dashboard test-runner test-dbguard test-swarm test-forensics lima-up lima-verify lima-shell clean
+        test-dashboard test-runner test-dbguard test-swarm test-forensics test-mcp test-benchmark lima-up lima-verify lima-shell clean
 
 all: verify-darwin
 
@@ -62,7 +62,13 @@ test-swarm:
 test-forensics:
 	$(PY) -B aegis_forensics.py --self-test
 
-verify-darwin: test-controller test-proxy test-bridge test-dashboard test-runner test-dbguard test-swarm test-forensics
+test-mcp:
+	$(PY) -B aegis_mcp_stdio.py --self-test
+
+test-benchmark:
+	$(PY) -B aegis_benchmark.py --self-test
+
+verify-darwin: test-controller test-proxy test-bridge test-dashboard test-runner test-dbguard test-swarm test-forensics test-mcp test-benchmark
 	@leftover=$$(ls -A | grep -E '^(\.aegis_canaries|__pycache__|.*\.aegis_rb)$$' || true); \
 	 if [ -n "$$leftover" ]; then echo "workspace artifacts left: $$leftover"; exit 1; fi; \
 	 if ls -d $(AEGIS_TMP) 2>/dev/null; then echo "tmp artifacts left"; exit 1; fi; \
