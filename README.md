@@ -2,7 +2,7 @@
 
 **Autonomous Execution Guard, Intent Sentinel & Zero-Trust Runtime Control Plane**: contains AI agents as untrusted, possibly Byzantine OS processes.
 
-![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-68%2F68%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-73%2F73%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 ## Architecture
 
@@ -53,6 +53,17 @@ Every `tools/call` is evaluated; blocked calls freeze the server tree, raise an 
 
 **Benchmark** — `python3 -B aegis_benchmark.py --write-doc` regenerates [BENCHMARK.md](BENCHMARK.md) (TPR/FPR and P50/P95/P99 per component).
 
+### Phase 7: Non-Euclidean & Topological Security Engine ([`aegis_hypermath.py`](aegis_hypermath.py))
+
+Pure-stdlib (`math`, `cmath`, `hashlib`) geometric & cohomological primitives fused into `AegisController.evaluate()`'s `risk` telemetry (`d_poincare`, `sheaf_energy`, `tropical_cost`, `padic_dist`):
+
+| Primitive | Mathematical Formulation | Security Function |
+|---|---|---|
+| `PoincarePrivilegeManifold` | Open Poincaré ball $\mathbb{B}^n_c$, Möbius addition $u \oplus_c v$, geodesic $d_{\mathbb{B}}(u,v) = \frac{2}{\sqrt{c}}\operatorname{arctanh}(\sqrt{c}\|(-u)\oplus_c v\|)$ | Privilege tiers scale radius $r \in [0.05, 0.98]$ monotonically toward boundary $1/\sqrt{c}$, causing exponential geodesic divergence toward `EXEC` / `CREDENTIAL` |
+| `CellularSheafObserver` | Cellular sheaf $(\mathcal{G}, \mathcal{F})$ with linear restriction maps $\mathcal{F}_{u\unlhd e}$ and Dirichlet energy $\mathcal{E}_{\text{sheaf}}(s) = \sum_e \|\mathcal{F}_{u\unlhd e}(s_u) - \mathcal{F}_{v\unlhd e}(s_v)\|_2^2$ | Detects semantic and provenance contradictions across multi-step traces and multi-agent claims ($H^1(\mathcal{G},\mathcal{F}) \neq 0$) |
+| `TropicalGeodesicEngine` | Min-plus semiring $(A \otimes B)_{ij} = \min_m (A_{im} + B_{mj})$, $k$-step horizon $W^{\otimes k}$ | Preemptively flags multi-hop staging setups (`READ_SENSITIVE -> TRANSFORM`) *before* `NET_OUT` or `CANARY_SINK` executes |
+| `PAdicUltrametricGuard` | Non-Archimedean $p$-adic ultrametric $d_p(x,y) = p^{-v_p(x,y)}$ satisfying $d_p(x,z) \le \max(d_p(x,y), d_p(y,z))$ | Isolates workspace clopen balls from canary decoys, OS root paths, and external URI namespaces |
+
 The full formal model, threat matrix and protocol specs are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Quickstart
@@ -102,7 +113,7 @@ sudo python3 aegis_bpf_bridge.py --run --intent "..." --cgroup /sys/fs/cgroup/ae
 
 ## Verification (`make verify-darwin`)
 
-Running `make verify-darwin` executes the complete verification suite spanning 10 modules and 68 assertions, followed by a strict zero-leftover-artifacts workspace audit:
+Running `make verify-darwin` executes the complete verification suite spanning 11 modules and 73 assertions, followed by a strict zero-leftover-artifacts workspace audit:
 
 | Suite | Target | Tests | Assertions / Verifications | Result |
 |---|---|---|---|---|
@@ -116,8 +127,9 @@ Running `make verify-darwin` executes the complete verification suite spanning 1
 | **Forensics** | `test-forensics` | 5 | F1 write + canary trip, F2 signed bundle verifies, F3 1-char tamper rejected, F4 re-signed WAL forgery rejected, F5 wrong key rejected | 5/5 PASS |
 | **MCP stdio** | `test-mcp` | 6 | M1 initialize/tools/list pass-through, M2 aligned `read_file`, M3 `rag_search` taints, M4 tainted `write_file` → `-32001` + server `SIGSTOP`, M5 framing intact + thaw, M6 clean EOF exit | 6/6 PASS |
 | **Benchmark** | `test-benchmark` | 1 | 16 cases (6 benign, 10 adversarial), asserts TPR = 100% and FPR = 0% — see [BENCHMARK.md](BENCHMARK.md) | 1/1 PASS |
+| **HyperMath** | `test-hypermath` | 5 | H1 Poincaré boundary divergence, H2 Cellular Sheaf Dirichlet energy & $H^1$ obstruction, H3 Tropical $W^{\otimes 3}$ preemptive 2-step setup alert, H4 $p$-adic Strong Triangle Inequality (680 triples) & clopen balls, H5 `AegisController.evaluate()` fusion | 5/5 PASS |
 
-**Total: 68/68 PASS, 0 workspace artifacts.**
+**Total: 73/73 PASS, 0 workspace artifacts.**
 
 Intent calibration: aligned actions score $D_{cos} \le 0.220$ and unaligned actions score $D_{cos} \ge 0.990$.
 

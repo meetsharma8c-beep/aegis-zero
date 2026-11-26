@@ -17,6 +17,9 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+from aegis_hypermath import HyperMathEngine
+
 
 class Priv(IntEnum):
     READ = 0; WRITE = 1; DELETE = 2; NET = 3; EXEC = 4
@@ -846,6 +849,7 @@ class AegisController:
         self.gate, self.canon = OOBHumanGate(operator_pub), Canonicalizer()
         self.freezer = freezer or ProcessTreeFreezer()
         self.cow = CoWShadowStore(workdir) if workdir is not None else None
+        self.hyper = HyperMathEngine(u0, workdir, canary_root)
         self.last_risk: dict = {}
         self.lock = threading.Lock()
 
@@ -873,11 +877,14 @@ class AegisController:
             chain = self.graph.chain_hit(cat)
             drift = self.graph.commit(cat, r)
             self.graph.last_entropy = h
+            _, findings = self.canon.scrub_args(a.args)
+            hm = self.hyper.observe(a.ast(), a.target, dom=dom, category=cat, granted=granted,
+                                    taint_violation=tv, stego=bool(findings))
             risk = {"D_cos": d, "domain": dom, "granted": granted, "H_graph": round(h, 3), "I_taint": int(tv),
-                    "R": round(r, 3), "ewma": round(drift, 3), "taint": self.taint.tau.name, "category": cat}
+                    "R": round(r, 3), "ewma": round(drift, 3), "taint": self.taint.tau.name, "category": cat,
+                    **hm}
             self.last_risk = risk
             log("RISK", f"{a.tool}({a.target}) dom={dom} D={d:.3f} H={h:.2f} I={int(tv)} R={r:.3f} ewma={drift:.3f}")
-            _, findings = self.canon.scrub_args(a.args)
             if findings:
                 log("CANON", f"stego stripped: {findings}")
                 return self._block(a, Verdict.DENY, "covert channel: " + "; ".join(findings), risk, True)
@@ -901,6 +908,7 @@ class AegisController:
             if self.taint.tau is Taint.TAINTED:
                 self.taint.declassify()
             self.graph.ewma = 0.0
+            self.hyper.reset_drift()
             stage = self._stage(a)
             tok = self.policy.mint(a, a.priv.name)
         self.freezer.thaw(a.pid)
