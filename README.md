@@ -2,7 +2,7 @@
 
 **Autonomous Execution Guard, Intent Sentinel & Zero-Trust Runtime Control Plane**: contains AI agents as untrusted, possibly Byzantine OS processes.
 
-![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-73%2F73%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-77%2F77%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 ## Architecture
 
@@ -104,7 +104,20 @@ python3 aegis_cli.py
 # Commands: list | show <id> | approve <id> | deny <id> [--kill] | rollback | status
 ```
 
-### 3. Linux Kernel Enforcement (BPF LSM)
+### 3. Live 3-Terminal SOC Radar & Red-Team Demo (`aegis_live_demo.py`)
+```bash
+# Terminal 1: Start L7 Proxy + OOB Unix Socket
+python3 aegis_proxy.py --intent "summarize report.md and write summary.md, using the knowledge base for context" \
+        --upstream http://127.0.0.1:9000/ --workdir ./sandbox --hold-timeout 45
+
+# Terminal 2: Start Dark-Mode SOC Web Dashboard (http://127.0.0.1:8788)
+python3 aegis_dashboard.py
+
+# Terminal 3: Fire paced benign & adversarial tool calls to watch the Poincare disk & Sheaf sparkline react live
+python3 aegis_live_demo.py
+```
+
+### 4. Linux Kernel Enforcement (BPF LSM)
 ```bash
 make lima-up        # Ubuntu 24.04 VM, kernel 6.8, lsm=...,bpf (from macOS)
 make lima-verify    # vmlinux.h -> clang -target bpf -> verifier load + autoattach -> bridge test
@@ -115,7 +128,7 @@ sudo python3 aegis_bpf_bridge.py --run --intent "..." --cgroup /sys/fs/cgroup/ae
 
 ## Verification (`make verify-darwin`)
 
-Running `make verify-darwin` executes the complete verification suite spanning 11 modules and 73 assertions, followed by a strict zero-leftover-artifacts workspace audit:
+Running `make verify-darwin` executes the complete verification suite spanning 12 modules and 77 assertions, followed by a strict zero-leftover-artifacts workspace audit:
 
 | Suite | Target | Tests | Assertions / Verifications | Result |
 |---|---|---|---|---|
@@ -130,10 +143,26 @@ Running `make verify-darwin` executes the complete verification suite spanning 1
 | **MCP stdio** | `test-mcp` | 6 | M1 initialize/tools/list pass-through, M2 aligned `read_file`, M3 `rag_search` taints, M4 tainted `write_file` → `-32001` + server `SIGSTOP`, M5 framing intact + thaw, M6 clean EOF exit | 6/6 PASS |
 | **Benchmark** | `test-benchmark` | 1 | 16 cases (6 benign, 10 adversarial), asserts TPR = 100% and FPR = 0% — see [BENCHMARK.md](BENCHMARK.md) | 1/1 PASS |
 | **HyperMath** | `test-hypermath` | 5 | H1 Poincaré boundary divergence, H2 Cellular Sheaf Dirichlet energy & $H^1$ obstruction, H3 Tropical $W^{\otimes 3}$ preemptive 2-step setup alert, H4 $p$-adic Strong Triangle Inequality (680 triples) & clopen balls, H5 `AegisController.evaluate()` fusion | 5/5 PASS |
+| **Live Demo** | `test-livedemo` | 4 | L1 aligned steps + signed declassification, L2 exfil chain held & denied (403), L3 live Poincaré / Sheaf / Tropical / $p$-adic telemetry over `/api/state`, L4 dashboard event history | 4/4 PASS |
 
-**Total: 73/73 PASS, 0 workspace artifacts.**
+**Total: 77/77 PASS, 0 workspace artifacts.**
 
 Intent calibration: aligned actions score $D_{cos} \le 0.220$ and unaligned actions score $D_{cos} \ge 0.990$.
+
+## OWASP Top 10 for Agentic Applications (2026) Compliance Matrix
+
+| OWASP Agentic ID | Risk Category (2026) | AEGIS-ZERO In-Path Enforcement Control |
+|---|---|---|
+| **ASI01** | Agent Goal Hijack | Context-isolated `IntentVerifier` (sees only $U_0$ and $\text{AST}(A_t)$, never $D_{\text{ext}}$) + Poincaré geodesic boundary |
+| **ASI02** | Tool Misuse & Exploitation | Capability taxonomy gate + single-use HMAC-SHA256 `(dev, ino)` capability tokens (`PolicyEngine` + `BPF_LSM`) |
+| **ASI03** | Identity & Privilege Abuse | Non-Archimedean $p$-adic clopen filesystem isolation + sub-agent privilege attenuation ($\text{Grants}(U_0) \cap \text{Grants}(U_B)$) |
+| **ASI04** | Agentic Supply Chain Vulnerabilities | Native stdio MCP proxy (`aegis_mcp_stdio.py`) + canary tripwire files & SQL honey-rows (`_aegis_canary_row`) |
+| **ASI05** | Unexpected Code Execution (RCE) | Ring 0 `bprm_check_security` LSM hook + seccomp syscall filter + atomic cgroups v2 / `SIGSTOP` process freezing |
+| **ASI06** | Memory & Context Poisoning | Monotone Biba/BLP `TaintEngine` ($\tau \to \text{TAINTED}$ on `rag_search` / `fetch_url`) + CoW Merkle WAL & SQL `SAVEPOINT` rollback |
+| **ASI07** | Insecure Inter-Agent Communication | `SwarmCoordinator` cross-agent taint inheritance + `Canonicalizer` stego scrubber + Cellular Sheaf cohomology ($H^1$) |
+| **ASI08** | Cascading Failures | Fail-closed hold-and-release queue (`--on-timeout kill`) + multi-agent taint circuit breakers |
+| **ASI09** | Human-Agent Trust Exploitation | Out-of-Band Web Enclave (`aegis_dashboard.py`) & `0600` Unix socket (`aegis_cli.py`) displaying raw AST + blast radius with Ed25519 signatures |
+| **ASI10** | Rogue Agents | EWMA slow-drift accumulator + Tropical semiring $W^{\otimes k}$ exploit horizon + `task_kill` daemon self-protection |
 
 ## Security Notes
 - **Enclave Asymmetry**: The proxy, bridge, and dashboard load **only** `operator_ed25519.pub`. Dumping daemon memory yields zero private keys; signature forgery is cryptographically impossible under RFC 8032 (verified by test K1).
