@@ -64,6 +64,8 @@ Pure-stdlib (`math`, `cmath`, `hashlib`) geometric & cohomological primitives fu
 | `TropicalGeodesicEngine` | Min-plus semiring $(A \otimes B)_{ij} = \min_m (A_{im} + B_{mj})$, $k$-step horizon $W^{\otimes k}$ | Preemptively flags multi-hop staging setups (`READ_SENSITIVE -> TRANSFORM`) *before* `NET_OUT` or `CANARY_SINK` executes |
 | `PAdicUltrametricGuard` | Non-Archimedean $p$-adic ultrametric $d_p(x,y) = p^{-v_p(x,y)}$ satisfying $d_p(x,z) \le \max(d_p(x,y), d_p(y,z))$ | Isolates workspace clopen balls from canary decoys, OS root paths, and external URI namespaces |
 
+**Phase 8 SOC Topology UI ([`aegis_dashboard.py`](aegis_dashboard.py)):** Renders an interactive HTML5 `<canvas>` Poincaré Privilege Disk (with $r = 0.92$ event horizon and curved Bezier geodesic arcs from $U_0$) alongside live Cellular Sheaf $\mathcal{E}_{\text{sheaf}}$ sparkline, Tropical $W^{\otimes k}$ horizon, and $p$-adic clopen ball telemetry cards.
+
 The full formal model, threat matrix and protocol specs are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Quickstart

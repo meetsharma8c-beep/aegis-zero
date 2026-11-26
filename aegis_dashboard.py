@@ -653,6 +653,107 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       overflow-x: auto;
     }
 
+    /* Phase 8: Non-Euclidean & Topological Telemetry */
+    .topology-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      .topology-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .poincare-box {
+      background: var(--bg-base);
+      border: 1px solid var(--border-default);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    #poincare-canvas {
+      display: block;
+      background: radial-gradient(circle at center, rgba(56, 139, 253, 0.06) 0%, rgba(13, 17, 23, 0.98) 72%);
+      border: 1px solid var(--border-muted);
+      border-radius: 6px;
+    }
+
+    .poincare-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 12px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .topo-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    .topo-card {
+      background: var(--bg-base);
+      border: 1px solid var(--border-default);
+      border-top: 2px solid var(--blue);
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .topo-card.sheaf-alert {
+      border-color: var(--red-border);
+      border-top-color: var(--red);
+      background: rgba(248, 81, 73, 0.06);
+      box-shadow: 0 0 14px rgba(248, 81, 73, 0.2);
+    }
+
+    .topo-card-num {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.3px;
+    }
+
+    .topo-card.sheaf-alert .topo-card-num {
+      color: var(--red-light);
+    }
+
+    .sparkline-svg {
+      width: 100%;
+      height: 48px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-muted);
+      border-radius: 4px;
+      display: block;
+    }
+
     .dag-svg {
       display: block;
       min-width: 800px;
@@ -855,6 +956,84 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div id="val-intent" class="intent-body">"Awaiting root intent specification..."</div>
     </section>
 
+    <!-- Phase 8: Non-Euclidean & Topological Telemetry -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          &#x1F9ED; Non-Euclidean &amp; Topological Telemetry
+          <span class="count-pill">RING 1/2 HYPERMATH</span>
+        </div>
+        <div id="val-poincare-pill" class="header-pill">d_poincare: 0.0000</div>
+      </div>
+      <div class="panel-body">
+        <div class="topology-layout">
+          <!-- Poincare Disk Canvas -->
+          <div class="poincare-box">
+            <div class="kpi-label" style="width: 100%;">
+              <span>POINCAR&Eacute; PRIVILEGE DISK (&#x1D539;<sup>n</sup><sub>c</sub>)</span>
+              <span>r &lt; 1.0</span>
+            </div>
+            <canvas id="poincare-canvas" width="280" height="280"></canvas>
+            <div class="poincare-legend">
+              <span class="legend-item"><span class="legend-dot" style="background: #39d0d8;"></span>U<sub>0</sub> (0,0)</span>
+              <span class="legend-item"><span class="legend-dot" style="background: #3fb950;"></span>ALLOW</span>
+              <span class="legend-item"><span class="legend-dot" style="background: #e3b341;"></span>ESCALATE</span>
+              <span class="legend-item"><span class="legend-dot" style="background: #f85149;"></span>DENY/TRIP</span>
+              <span class="legend-item"><span class="legend-dot" style="border: 1px dashed #f85149;"></span>r=0.92 Horizon</span>
+            </div>
+          </div>
+
+          <!-- Three Live Topological Metric Cards -->
+          <div class="topo-metrics-grid">
+            <!-- Card 1: Cellular Sheaf Energy -->
+            <div id="card-sheaf" class="topo-card">
+              <div class="kpi-label">
+                <span>CELLULAR SHEAF ENERGY (&Escr;<sub>sheaf</sub>)</span>
+                <span>&theta;=0.50</span>
+              </div>
+              <div class="kpi-value-row">
+                <span id="val-sheaf-energy" class="topo-card-num">0.0000</span>
+                <span class="kpi-denom">||&delta;s||<sub>2</sub><sup>2</sup></span>
+              </div>
+              <svg id="sheaf-sparkline" class="sparkline-svg" viewBox="0 0 220 48" preserveAspectRatio="none">
+                <line x1="0" y1="24" x2="220" y2="24" stroke="#30363d" stroke-width="1" stroke-dasharray="3,3"/>
+                <polyline id="sheaf-sparkline-line" fill="none" stroke="#3fb950" stroke-width="2" points="0,42 220,42"/>
+              </svg>
+              <div id="val-sheaf-status" class="kpi-subtext">Global section coherent (H&sup1; = 0)</div>
+            </div>
+
+            <!-- Card 2: Tropical Exploit Horizon -->
+            <div class="topo-card" style="border-top-color: var(--amber);">
+              <div class="kpi-label">
+                <span>TROPICAL EXPLOIT HORIZON (W<sup>&otimes;k</sup>)</span>
+                <span>MIN-PLUS</span>
+              </div>
+              <div class="kpi-value-row">
+                <span id="val-tropical-cost" class="topo-card-num">0.0000</span>
+                <span class="kpi-denom">sink resistance</span>
+              </div>
+              <div id="val-tropical-badge" class="kpi-badge badge-trusted">HORIZON CLEAR</div>
+              <div class="kpi-subtext">Min geodesic cost to NET_OUT / CANARY_SINK</div>
+            </div>
+
+            <!-- Card 3: p-Adic Ultrametric -->
+            <div class="topo-card" style="border-top-color: var(--purple);">
+              <div class="kpi-label">
+                <span>p-ADIC ULTRAMETRIC (d<sub>p</sub>)</span>
+                <span>p = 7</span>
+              </div>
+              <div class="kpi-value-row">
+                <span id="val-padic-dist" class="topo-card-num">0.000000</span>
+                <span class="kpi-denom">p<sup>-v<sub>p</sub></sup></span>
+              </div>
+              <div id="val-padic-ball" class="kpi-badge badge-trusted">WORKSPACE CLOPEN BALL</div>
+              <div class="kpi-subtext">Strong triangle inequality clopen isolation</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Pending Actions Panel (Hold & Release Queue) -->
     <section class="panel">
       <div class="panel-header">
@@ -932,6 +1111,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   <script>
     let stateCache = null;
+    const sheafSeries = [0.0];
+    const poincareTrace = [];
+
+    function hashAngle(label) {
+      let h = 2166136261;
+      const s = String(label || 'action');
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return ((h >>> 0) % 3600) * (Math.PI * 2.0 / 3600.0);
+    }
 
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
@@ -1046,6 +1237,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
       // 10. WAL Table
       renderWALTable(data);
+
+      // 11. Non-Euclidean & Topological Telemetry
+      renderTopology(data);
     }
 
     function renderPending(pendingList) {
@@ -1146,6 +1340,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                   <div class="risk-chip">I_taint: <strong>${risk.I_taint !== undefined ? risk.I_taint : 'N/A'}</strong></div>
                   <div class="risk-chip">R: <strong>${risk.R !== undefined ? risk.R : 'N/A'}</strong></div>
                   <div class="risk-chip">ewma: <strong>${risk.ewma !== undefined ? risk.ewma : 'N/A'}</strong></div>
+                  <div class="risk-chip">d_poincare: <strong>${risk.d_poincare !== undefined ? risk.d_poincare : 'N/A'}</strong></div>
+                  <div class="risk-chip">sheaf: <strong>${risk.sheaf_energy !== undefined ? risk.sheaf_energy : 'N/A'}</strong></div>
+                  <div class="risk-chip">tropical: <strong>${risk.tropical_cost !== undefined ? risk.tropical_cost : 'N/A'}</strong></div>
+                  <div class="risk-chip">d_p: <strong>${risk.padic_dist !== undefined ? risk.padic_dist : 'N/A'}</strong></div>
                 </div>
               </div>
             </div>
@@ -1260,6 +1458,217 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       tbody.innerHTML = rows;
     }
 
+    function renderTopology(data) {
+      const lr = data.last_risk || {};
+      const dPoincare = typeof lr.d_poincare === 'number' ? lr.d_poincare : 0.0;
+      const sheafEnergy = typeof lr.sheaf_energy === 'number' ? lr.sheaf_energy : 0.0;
+      const tropicalCost = typeof lr.tropical_cost === 'number' ? lr.tropical_cost : 0.0;
+      const padicDist = typeof lr.padic_dist === 'number' ? lr.padic_dist : 0.0;
+
+      document.getElementById('val-poincare-pill').innerText = `d_poincare: ${dPoincare.toFixed(4)}`;
+
+      // 1. Cellular Sheaf Energy card + inline SVG sparkline
+      document.getElementById('val-sheaf-energy').innerText = sheafEnergy.toFixed(4);
+      sheafSeries.push(sheafEnergy);
+      if (sheafSeries.length > 28) sheafSeries.shift();
+
+      const sheafCard = document.getElementById('card-sheaf');
+      const sheafStatus = document.getElementById('val-sheaf-status');
+      const sparkLine = document.getElementById('sheaf-sparkline-line');
+      const sheafHigh = sheafEnergy > 0.5;
+      if (sheafHigh) {
+        sheafCard.classList.add('sheaf-alert');
+        sheafStatus.innerText = 'COHOMOLOGY OBSTRUCTION (H\u00B9 \u2260 0)';
+        sheafStatus.style.color = 'var(--red-light)';
+        sparkLine.setAttribute('stroke', '#f85149');
+      } else {
+        sheafCard.classList.remove('sheaf-alert');
+        sheafStatus.innerText = 'Global section coherent (H\u00B9 = 0)';
+        sheafStatus.style.color = 'var(--text-muted)';
+        sparkLine.setAttribute('stroke', '#3fb950');
+      }
+      const maxScale = Math.max(1.0, ...sheafSeries);
+      const pts = sheafSeries.map((val, idx) => {
+        const x = sheafSeries.length === 1 ? 220 : (idx / (sheafSeries.length - 1)) * 220;
+        const y = 44 - Math.min(1.0, Math.max(0.0, val / maxScale)) * 38;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      sparkLine.setAttribute('points', pts);
+
+      // 2. Tropical Exploit Horizon card
+      document.getElementById('val-tropical-cost').innerText = tropicalCost.toFixed(4);
+      const tropBadge = document.getElementById('val-tropical-badge');
+      if (tropicalCost > 0.0 && tropicalCost < 0.80) {
+        tropBadge.className = 'kpi-badge badge-escalate';
+        tropBadge.innerText = 'PREEMPTIVE STAGING ALERT';
+      } else {
+        tropBadge.className = 'kpi-badge badge-trusted';
+        tropBadge.innerText = tropicalCost === 0.0 ? 'STANDBY (NO STEPS)' : 'SAFE SINK HORIZON';
+      }
+
+      // 3. p-Adic Ultrametric card
+      document.getElementById('val-padic-dist').innerText = padicDist.toFixed(6);
+      const padicBadge = document.getElementById('val-padic-ball');
+      if (padicDist <= 0.15) {
+        padicBadge.className = 'kpi-badge badge-trusted';
+        padicBadge.innerText = 'WORKSPACE CLOPEN BALL';
+      } else {
+        padicBadge.className = 'kpi-badge badge-trip';
+        padicBadge.innerText = 'DISCONNECTED / EXTERNAL BALL';
+      }
+
+      // Collect recent & pending actions for the Poincare Disk
+      const plotItems = [];
+      if (Array.isArray(data.history)) {
+        for (const ev of data.history.slice(-12)) {
+          if (ev.tool || ev.target) {
+            const evRisk = ev.risk || {};
+            plotItems.push({
+              key: `${ev.tool || 'op'}:${ev.target || ''}`,
+              verdict: ev.verdict || 'ALLOW',
+              d: typeof evRisk.d_poincare === 'number' ? evRisk.d_poincare : dPoincare
+            });
+          }
+        }
+      }
+      if (Array.isArray(data.pending)) {
+        for (const p of data.pending) {
+          const ast = (p.payload && p.payload.proposed_action_ast) ? p.payload.proposed_action_ast : {};
+          const pRisk = (p.payload && p.payload.risk) ? p.payload.risk : {};
+          plotItems.push({
+            key: `${ast.tool || 'held'}:${ast.target || p.id}`,
+            verdict: p.verdict || 'ESCALATE',
+            d: typeof pRisk.d_poincare === 'number' ? pRisk.d_poincare : dPoincare
+          });
+        }
+      }
+      if (plotItems.length === 0 && (lr.domain || dPoincare > 0.0)) {
+        const impliedVerdict = (lr.I_taint || (typeof lr.R === 'number' && lr.R >= 0.45)) ? 'ESCALATE' : 'ALLOW';
+        const sigKey = `${lr.category || 'ACT'}:${lr.domain || 'dom'}:${dPoincare.toFixed(4)}`;
+        if (poincareTrace.length === 0 || poincareTrace[poincareTrace.length - 1].sigKey !== sigKey) {
+          poincareTrace.push({ sigKey, key: `${lr.domain || 'action'}:${lr.category || ''}`, verdict: impliedVerdict, d: dPoincare });
+          if (poincareTrace.length > 10) poincareTrace.shift();
+        }
+        for (const item of poincareTrace) plotItems.push(item);
+      }
+
+      drawPoincareDisk(plotItems);
+    }
+
+    function drawPoincareDisk(actions) {
+      const canvas = document.getElementById('poincare-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const unitR = 118;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Subtle crosshair axes
+      ctx.save();
+      ctx.strokeStyle = 'rgba(48, 54, 61, 0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - unitR, cy);
+      ctx.lineTo(cx + unitR, cy);
+      ctx.moveTo(cx, cy - unitR);
+      ctx.lineTo(cx, cy + unitR);
+      ctx.stroke();
+      ctx.restore();
+
+      // Dashed inner geodesic rings (r = 0.25, 0.50, 0.75)
+      for (const rFrac of [0.25, 0.50, 0.75]) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(139, 148, 158, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, rFrac * unitR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Red dashed Event Horizon ring at r = 0.92
+      ctx.save();
+      ctx.strokeStyle = 'rgba(248, 81, 73, 0.85)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, 0.92 * unitR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Outer unit disk boundary (r = 1.0)
+      ctx.save();
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, unitR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Plot action points and curved quadratic Bezier geodesic arcs from origin
+      for (const act of actions) {
+        const dVal = Math.max(0.0, Number(act.d) || 0.0);
+        const rNorm = Math.min(0.96, Math.tanh(dVal / 2.0));
+        const theta = hashAngle(act.key);
+        const px = cx + rNorm * unitR * Math.cos(theta);
+        const py = cy + rNorm * unitR * Math.sin(theta);
+
+        let color = '#3fb950';
+        if (act.verdict === 'ESCALATE') {
+          color = '#e3b341';
+        } else if (act.verdict === 'DENY' || act.verdict === 'CANARY_TRIP') {
+          color = '#f85149';
+        }
+
+        // Curved quadratic Bezier geodesic arc from (cx, cy) to (px, py)
+        const midX = (cx + px) / 2.0;
+        const midY = (cy + py) / 2.0;
+        const dx = px - cx;
+        const dy = py - cy;
+        const bend = 0.22;
+        const ctrlX = midX - dy * bend;
+        const ctrlY = midY + dx * bend;
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.82;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, px, py);
+        ctx.stroke();
+
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // User Root Intent (U0) cyan dot at center (0, 0)
+      ctx.save();
+      ctx.fillStyle = 'rgba(57, 208, 216, 0.24)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#39d0d8';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#c9d1d9';
+      ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.fillText('U0', cx + 7, cy - 6);
+      ctx.restore();
+    }
+
     async function sendDecision(id, decision, kill = false) {
       showToast(`Transmitting operator decision: ${decision}${kill ? ' (kill)' : ''}...`, 'info');
       try {
@@ -1360,6 +1769,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "":
             return self._send_html(200, DASHBOARD_HTML)
         elif path == "/api/state":
+            default_risk = {
+                "d_poincare": 0.0,
+                "sheaf_energy": 0.0,
+                "tropical_cost": 0.0,
+                "padic_dist": 0.0,
+            }
             client = self.client
             if client is None:
                 return self._send_json(200, {
@@ -1367,7 +1782,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     "lineage": [],
                     "H_graph": 0.0,
                     "ewma": 0.0,
-                    "last_risk": {},
+                    "last_risk": dict(default_risk),
                     "active_tokens": 0,
                     "intent_tier": "tier2-taxonomy+idf",
                     "u0": "",
@@ -1386,12 +1801,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             pending_items = list(client.pending.values())
             telemetry["pending"] = pending_items
 
-            # Guarantee default keys
+            # Guarantee default keys and Phase 7/8 hypermath defaults in last_risk
             telemetry.setdefault("taint", "TRUSTED")
             telemetry.setdefault("lineage", [])
             telemetry.setdefault("H_graph", 0.0)
             telemetry.setdefault("ewma", 0.0)
-            telemetry.setdefault("last_risk", {})
+            last_risk = dict(telemetry.get("last_risk") or {})
+            for k, v in default_risk.items():
+                last_risk.setdefault(k, v)
+            telemetry["last_risk"] = last_risk
             telemetry.setdefault("active_tokens", 0)
             telemetry.setdefault("intent_tier", "tier2-taxonomy+idf")
             telemetry.setdefault("u0", "")
@@ -1458,7 +1876,8 @@ def attach_oob_listener(client: OOBClient, server: DashboardServer) -> None:
         kind = msg.get("type")
         data = msg.get("data", {})
         if kind == "pending":
-            ast = data.get("payload", {}).get("proposed_action_ast", {})
+            pl = data.get("payload", {})
+            ast = pl.get("proposed_action_ast", {})
             server.record_event({
                 "type": "PENDING",
                 "ts": time.time(),
@@ -1466,7 +1885,8 @@ def attach_oob_listener(client: OOBClient, server: DashboardServer) -> None:
                 "verdict": data.get("verdict"),
                 "tool": ast.get("tool"),
                 "target": ast.get("target"),
-                "reason": data.get("payload", {}).get("reason"),
+                "reason": pl.get("reason"),
+                "risk": pl.get("risk", {}),
             })
         elif kind == "resolved":
             server.record_event({
@@ -1546,31 +1966,35 @@ def run_self_test() -> int:
     # 12. Verification tests
     results: list[tuple[str, bool, str]] = []
 
-    # Test D1: GET / returns 200 and HTML containing "AEGIS"
+    # Test D1: GET / returns 200 and HTML containing "AEGIS" and "poincare-canvas"
     try:
         req = urllib.request.Request(f"http://127.0.0.1:{dash_port}/")
         with urllib.request.urlopen(req, timeout=5.0) as resp:
             d1_code = resp.status
             d1_body = resp.read().decode("utf-8")
-            d1_pass = (d1_code == 200 and "AEGIS" in d1_body)
-            d1_msg = f"http {d1_code}, has_aegis={'AEGIS' in d1_body}"
+            has_canvas = "poincare-canvas" in d1_body
+            d1_pass = (d1_code == 200 and "AEGIS" in d1_body and has_canvas)
+            d1_msg = f"http {d1_code}, has_aegis={'AEGIS' in d1_body}, poincare_canvas={has_canvas}"
     except Exception as e:
         d1_pass = False
         d1_msg = f"exception: {e}"
-    results.append(("D1: GET / returns 200 and HTML containing AEGIS", d1_pass, d1_msg))
+    results.append(("D1: GET / returns 200 HTML with poincare-canvas", d1_pass, d1_msg))
 
-    # Test D2: GET /api/state returns 200 JSON with "taint" key
+    # Test D2: GET /api/state returns 200 JSON with "taint" and "last_risk" hypermath defaults
     try:
         req = urllib.request.Request(f"http://127.0.0.1:{dash_port}/api/state")
         with urllib.request.urlopen(req, timeout=5.0) as resp:
             d2_code = resp.status
             d2_json = json.loads(resp.read().decode("utf-8"))
-            d2_pass = (d2_code == 200 and "taint" in d2_json)
-            d2_msg = f"http {d2_code}, taint={d2_json.get('taint')}"
+            lr = d2_json.get("last_risk")
+            hm_keys = ("d_poincare", "sheaf_energy", "tropical_cost", "padic_dist")
+            has_lr = isinstance(lr, dict) and all(isinstance(lr.get(k), (int, float)) for k in hm_keys)
+            d2_pass = (d2_code == 200 and "taint" in d2_json and has_lr)
+            d2_msg = f"http {d2_code}, taint={d2_json.get('taint')}, hypermath_keys={has_lr}"
     except Exception as e:
         d2_pass = False
         d2_msg = f"exception: {e}"
-    results.append(("D2: GET /api/state returns 200 JSON with taint", d2_pass, d2_msg))
+    results.append(("D2: GET /api/state has taint & last_risk hypermath", d2_pass, d2_msg))
 
     # Test D3: POST /api/decide with a held request -> approve succeeds
     # First trigger a held request: rag_search (ingests D_ext and taints session), then write_file in thread
