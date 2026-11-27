@@ -126,6 +126,24 @@ make vmlinux build-bpf verify-bpf
 sudo python3 aegis_bpf_bridge.py --run --intent "..." --cgroup /sys/fs/cgroup/aegis_sandbox
 ```
 
+### 5. Drop-In MCP Client Setup (Claude Desktop, Claude Code & Cursor)
+Ready-to-use `stdio` MCP client configurations wrapping `@modelcontextprotocol/server-filesystem` inside [`aegis_mcp_stdio.py`](aegis_mcp_stdio.py) live in [`configs/`](configs/):
+
+```bash
+# Ensure operator keypair & sandbox folder exist
+python3 aegis_cli.py --init-key
+mkdir -p /Users/ms/Downloads/Aegis-Zero/sandbox
+
+# Claude Desktop (macOS)
+cp configs/claude_desktop_config.json ~/Library/Application\ Support/Claude/claude_desktop_config.json
+
+# Cursor
+mkdir -p ~/.cursor && cp configs/cursor_mcp.json ~/.cursor/mcp.json
+
+# Claude Code CLI
+./configs/setup_claude_code.sh
+```
+
 ## Verification (`make verify-darwin`)
 
 Running `make verify-darwin` executes the complete verification suite spanning 12 modules and 77 assertions, followed by a strict zero-leftover-artifacts workspace audit:
