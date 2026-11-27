@@ -8,11 +8,11 @@ BPFTOOL   ?= bpftool
 ARCH      := $(shell uname -m | sed -e 's/x86_64/x86/' -e 's/aarch64/arm64/' -e 's/arm64/arm64/')
 BPF_OBJ   := aegis_kernel_hook.bpf.o
 PIN_DIR   := /sys/fs/bpf/aegis
-AEGIS_TMP := /tmp/aegis_canaries_* /tmp/aegis_cow_* /tmp/aegis_work_* /tmp/aegis_demo_* /tmp/aegis_keys_* /tmp/aegis_bridge_* /tmp/aegis_oob.sock /tmp/aegis_dashboard_* /tmp/aegis_run_* /tmp/aegis_dbguard_* /tmp/aegis_swarm_* /tmp/aegis_forensics_* /tmp/aegis_mcp_* /tmp/aegis_bench_* /tmp/aegis_hyper_* /tmp/aegis_livedemo_*
+AEGIS_TMP := /tmp/aegis_canaries_* /tmp/aegis_cow_* /tmp/aegis_work_* /tmp/aegis_demo_* /tmp/aegis_keys_* /tmp/aegis_bridge_* /tmp/aegis_oob.sock /tmp/aegis_dashboard_* /tmp/aegis_run_* /tmp/aegis_dbguard_* /tmp/aegis_swarm_* /tmp/aegis_forensics_* /tmp/aegis_mcp_* /tmp/aegis_bench_* /tmp/aegis_hyper_* /tmp/aegis_livedemo_* /tmp/aegis_concode_*
 LIMA_VM   ?= aegis-ebpf
 
 .PHONY: all vmlinux build-bpf verify-bpf unload-bpf verify-darwin test-controller test-proxy test-bridge \
-        test-dashboard test-runner test-dbguard test-swarm test-forensics test-mcp test-benchmark test-hypermath test-livedemo lima-up lima-verify lima-shell clean
+        test-dashboard test-runner test-dbguard test-swarm test-forensics test-mcp test-benchmark test-hypermath test-livedemo test-concode lima-up lima-verify lima-shell clean
 
 all: verify-darwin
 
@@ -75,7 +75,10 @@ test-hypermath:
 test-livedemo:
 	$(PY) -B aegis_live_demo.py --self-test
 
-verify-darwin: test-controller test-proxy test-bridge test-dashboard test-runner test-dbguard test-swarm test-forensics test-mcp test-benchmark test-hypermath test-livedemo
+test-concode:
+	$(PY) -B aegis_concode_bridge.py --self-test
+
+verify-darwin: test-controller test-proxy test-bridge test-dashboard test-runner test-dbguard test-swarm test-forensics test-mcp test-benchmark test-hypermath test-livedemo test-concode
 	@leftover=$$(ls -A | grep -E '^(\.aegis_canaries|__pycache__|.*\.aegis_rb)$$' || true); \
 	 if [ -n "$$leftover" ]; then echo "workspace artifacts left: $$leftover"; exit 1; fi; \
 	 if ls -d $(AEGIS_TMP) 2>/dev/null; then echo "tmp artifacts left"; exit 1; fi; \

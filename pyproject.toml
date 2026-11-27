@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aegis-zero"
-version = "1.1.0"
+version = "1.2.0"
 description = "Autonomous Execution Guard, Intent Sentinel & Zero-Trust AI Agent Containment System"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -66,6 +66,7 @@ aegis-mcp-stdio = "aegis_mcp_stdio:main"
 aegis-benchmark = "aegis_benchmark:main"
 aegis-hypermath = "aegis_hypermath:main"
 aegis-live-demo = "aegis_live_demo:main"
+aegis-concode = "aegis_concode_bridge:main"
 
 [tool.setuptools]
 py-modules = [
@@ -82,4 +83,5 @@ py-modules = [
     "aegis_benchmark",
     "aegis_hypermath",
     "aegis_live_demo",
+    "aegis_concode_bridge",
 ]

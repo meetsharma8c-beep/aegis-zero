@@ -2,7 +2,7 @@
 
 **Autonomous Execution Guard, Intent Sentinel & Zero-Trust Runtime Control Plane**: contains AI agents as untrusted, possibly Byzantine OS processes.
 
-![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-77%2F77%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/runtime%20deps-stdlib%20only-brightgreen) ![ebpf](https://img.shields.io/badge/Ring%200-BPF%20LSM-orange) ![sig](https://img.shields.io/badge/OOB-Ed25519%20RFC%208032-purple) ![tests](https://img.shields.io/badge/verify--darwin-83%2F83%20pass-success) ![license](https://img.shields.io/badge/license-Apache--2.0-green)
 
 ## Architecture
 
@@ -65,6 +65,13 @@ Pure-stdlib (`math`, `cmath`, `hashlib`) geometric & cohomological primitives fu
 | `PAdicUltrametricGuard` | Non-Archimedean $p$-adic ultrametric $d_p(x,y) = p^{-v_p(x,y)}$ satisfying $d_p(x,z) \le \max(d_p(x,y), d_p(y,z))$ | Isolates workspace clopen balls from canary decoys, OS root paths, and external URI namespaces |
 
 **Phase 8 SOC Topology UI ([`aegis_dashboard.py`](aegis_dashboard.py)):** Renders an interactive HTML5 `<canvas>` Poincaré Privilege Disk (with $r = 0.92$ event horizon and curved Bezier geodesic arcs from $U_0$) alongside live Cellular Sheaf $\mathcal{E}_{\text{sheaf}}$ sparkline, Tropical $W^{\otimes k}$ horizon, and $p$-adic clopen ball telemetry cards.
+
+### Phase 9: CONCODE Neural Brain & Universal Tool Bus Bridge ([`aegis_concode_bridge.py`](aegis_concode_bridge.py))
+
+Bidirectional integration between **AEGIS-ZERO** and [**CONCODE_BRAIN**](https://github.com/meetsharma8c-beep/CONCODE_BRAIN) / [**CONCODE.WEB**](https://github.com/meetsharma8c-beep/CONCODE.WEB):
+- **18-Guild Capability Ceiling (`ConcodeGuildScoper`):** Intersects $\text{Grants}(U_0) \cap \text{GuildCeiling}(\text{guild})$ across CONCODE's 18 expert guilds (`ui_ux`, `database`, `security`, `devops`, `critic_verifier`, etc.).
+- **Static AST CWE & SMT Prover (`ConcodePayloadVerifier`):** Audits tool code/SQL payloads before execution for `CWE-78`, `CWE-89`, `CWE-94`, `CWE-208`, `CWE-502`, `CWE-798`, and `CWE-918`, proves wait-for lock graph deadlock freedom, and generates `PROVEN_SAT` / `UNSAT_CONFLICT` certificates with minimal `unsat_core`.
+- **Universal Tool Bus Guard (`ConcodeToolBusGuard`):** Maps CONCODE's `READ_ONLY`, `WORKSPACE_WRITE`, `SANDBOX_EXEC`, `EXTERNAL_NETWORK`, and `PERM_HUMAN_APPROVAL` tiers into `AegisController` + Ed25519 OOB approval + signed `ForensicExporter` bundles.
 
 The full formal model, threat matrix and protocol specs are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -146,7 +153,7 @@ mkdir -p ~/.cursor && cp configs/cursor_mcp.json ~/.cursor/mcp.json
 
 ## Verification (`make verify-darwin`)
 
-Running `make verify-darwin` executes the complete verification suite spanning 12 modules and 77 assertions, followed by a strict zero-leftover-artifacts workspace audit:
+Running `make verify-darwin` executes the complete verification suite spanning 13 modules and 83 assertions, followed by a strict zero-leftover-artifacts workspace audit:
 
 | Suite | Target | Tests | Assertions / Verifications | Result |
 |---|---|---|---|---|
@@ -162,8 +169,9 @@ Running `make verify-darwin` executes the complete verification suite spanning 1
 | **Benchmark** | `test-benchmark` | 1 | 16 cases (6 benign, 10 adversarial), asserts TPR = 100% and FPR = 0% — see [BENCHMARK.md](BENCHMARK.md) | 1/1 PASS |
 | **HyperMath** | `test-hypermath` | 5 | H1 Poincaré boundary divergence, H2 Cellular Sheaf Dirichlet energy & $H^1$ obstruction, H3 Tropical $W^{\otimes 3}$ preemptive 2-step setup alert, H4 $p$-adic Strong Triangle Inequality (680 triples) & clopen balls, H5 `AegisController.evaluate()` fusion | 5/5 PASS |
 | **Live Demo** | `test-livedemo` | 4 | L1 aligned steps + signed declassification, L2 exfil chain held & denied (403), L3 live Poincaré / Sheaf / Tropical / $p$-adic telemetry over `/api/state`, L4 dashboard event history | 4/4 PASS |
+| **CONCODE Bridge** | `test-concode` | 6 | C1 `ui_ux` clean write + SAT proof + WAL, C2 18-guild ceiling attenuation, C3 static AST CWE gate (`78/89/208/798`), C4 SMT `unsat_core` + wait-for deadlock cycle prover, C5 `PERM_HUMAN_APPROVAL` Ed25519 OOB gate, C6 signed CONCODE×AEGIS forensic bundle | 6/6 PASS |
 
-**Total: 77/77 PASS, 0 workspace artifacts.**
+**Total: 83/83 PASS, 0 workspace artifacts.**
 
 Intent calibration: aligned actions score $D_{cos} \le 0.220$ and unaligned actions score $D_{cos} \ge 0.990$.
 
