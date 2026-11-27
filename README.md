@@ -149,6 +149,50 @@ Running `make verify-darwin` executes the complete verification suite spanning 1
 
 Intent calibration: aligned actions score $D_{cos} \le 0.220$ and unaligned actions score $D_{cos} \ge 0.990$.
 
+### Verified Linux Ring 0 `BPF_LSM` Verifier Output (`make lima-verify`, Ubuntu 24.04 ARM64, Kernel `6.8.0-151-generic`)
+
+```text
+$ cat /sys/kernel/security/lsm
+lockdown,capability,landlock,yama,apparmor,bpf
+
+$ sudo bpftool prog loadall aegis_kernel_hook.bpf.o /sys/fs/bpf/aegis/progs pinmaps /sys/fs/bpf/aegis/maps autoattach
+$ sudo bpftool prog show
+72: lsm  name aegis_file_open  tag f5abafb16e5cd34b  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 1296B  jited 1144B  memlock 4096B  map_ids 16,17,20,18
+	btf_id 114
+73: lsm  name aegis_file_permission  tag 5b609a3a1724f42a  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 832B  jited 760B  memlock 4096B  map_ids 16,17,20
+	btf_id 114
+74: lsm  name aegis_inode_getattr  tag af2a33a0946fd7fa  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 880B  jited 808B  memlock 4096B  map_ids 16,17,20
+	btf_id 114
+75: lsm  name aegis_inode_unlink  tag f351110cf3ae008c  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 1192B  jited 1072B  memlock 4096B  map_ids 16,17,20,18
+	btf_id 114
+76: lsm  name aegis_bprm_check  tag c96fd0e90fa86543  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 1248B  jited 1112B  memlock 4096B  map_ids 16,17,20,18
+	btf_id 114
+77: lsm  name aegis_socket_connect  tag c60eb203f773ad17  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 1456B  jited 1224B  memlock 4096B  map_ids 16,18,20
+	btf_id 114
+78: lsm  name aegis_socket_sendmsg  tag d3aa548beb041f52  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 1536B  jited 1296B  memlock 4096B  map_ids 16,18,20
+	btf_id 114
+79: lsm  name aegis_task_kill  tag c57abe572de4ff44  gpl
+	loaded_at 2026-11-28T02:43:40+0530  uid 0
+	xlated 568B  jited 584B  memlock 4096B  map_ids 16,19,20
+	btf_id 114
+```
+
+Live VM Ring 0 + Ring 1 integration (`sudo python3 -B aegis_bpf_bridge.py --test` and `sudo python3 -B aegis_controller.py`) passes **10/10** bridge assertions (`B1–B7`, including `B7 live kernel map update/delete: linux-bpf` over `bpf(2)`) and **10/10** controller assertions with atomic Linux `cgroups v2` (`cgroup.freeze=1`) freezing and the native `cryptography` Ed25519 backend.
+
 ## OWASP Top 10 for Agentic Applications (2026) Compliance Matrix
 
 | OWASP Agentic ID | Risk Category (2026) | AEGIS-ZERO In-Path Enforcement Control |

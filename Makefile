@@ -28,6 +28,7 @@ $(BPF_OBJ): aegis_kernel_hook.bpf.c vmlinux.h
 # Loads into the kernel verifier and attaches all LSM programs (requires root, bpf in lsm=).
 verify-bpf: $(BPF_OBJ)
 	@grep -qw bpf /sys/kernel/security/lsm || (echo "BPF LSM not active: check lsm= boot param" && exit 1)
+	sudo rm -rf $(PIN_DIR)
 	sudo mkdir -p $(PIN_DIR)
 	sudo $(BPFTOOL) prog loadall $(BPF_OBJ) $(PIN_DIR)/progs pinmaps $(PIN_DIR)/maps autoattach
 	sudo $(BPFTOOL) prog show | grep -E 'lsm .*aegis_'

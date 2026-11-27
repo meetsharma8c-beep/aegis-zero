@@ -72,9 +72,20 @@ def log(tag: str, msg: str) -> None:
 
 # --------------------------------------------------------------------------- freezing
 def process_state(pid: int) -> str:
-    """Return the ps STAT code (e.g. 'S', 'T', 'R') or '' if the process is gone."""
+    """Return the ps STAT code (e.g. 'S', 'T', 'R'), 'Tf' if cgroup-v2 frozen, or '' if the process is gone."""
     r = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True)
-    return r.stdout.strip()
+    st = r.stdout.strip()
+    if st and not st.startswith("T") and sys.platform.startswith("linux"):
+        try:
+            for line in Path(f"/proc/{pid}/cgroup").read_text().splitlines():
+                parts = line.split(":", 2)
+                if len(parts) == 3 and parts[0] == "0" and parts[2] not in ("", "/"):
+                    ev = Path("/sys/fs/cgroup") / parts[2].lstrip("/") / "cgroup.events"
+                    if ev.exists() and "frozen 1" in ev.read_text():
+                        return "Tf"
+        except OSError:
+            pass
+    return st
 
 
 def descendants(pid: int) -> list[int]:
@@ -97,17 +108,73 @@ class ProcessTreeFreezer:
     """
 
     def __init__(self, cgroup: str = "/sys/fs/cgroup/aegis_sandbox"):
-        self.ctl = Path(cgroup) / "cgroup.freeze"
+        self.base = Path(cgroup)
+        if sys.platform.startswith("linux") and os.geteuid() == 0 and Path("/sys/fs/cgroup/cgroup.controllers").exists():
+            try:
+                self.base.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+        self.ctl = self.base / "cgroup.freeze"
         self.use_cgroup = sys.platform.startswith("linux") and self.ctl.exists() and os.access(self.ctl, os.W_OK)
         self.roots: set[int] = set()
+        self.cgroups: dict[int, Path] = {}
         self.stopped: dict[int, list[int]] = {}
         self.lock = threading.Lock()
 
+    def _pid_in_base(self, pid: int) -> bool:
+        try:
+            rel = "/" + self.base.relative_to("/sys/fs/cgroup").as_posix()
+            return any(line.endswith(f":{rel}") for line in Path(f"/proc/{pid}/cgroup").read_text().splitlines())
+        except (OSError, ValueError):
+            return False
+
+    @staticmethod
+    def _wait_frozen(cg: Path, want: str) -> None:
+        ev = cg / "cgroup.events"
+        deadline = time.time() + 0.5
+        while time.time() < deadline:
+            try:
+                if f"frozen {want}" in ev.read_text():
+                    return
+            except OSError:
+                return
+            time.sleep(0.005)
+
     def register(self, pid: int) -> None:
-        self.roots.add(pid)
+        with self.lock:
+            self.roots.add(pid)
+            if self.use_cgroup and pid > 0:
+                if self._pid_in_base(pid):
+                    self.cgroups[pid] = self.base
+                else:
+                    cg = self.base / f"agent_{pid}"
+                    try:
+                        cg.mkdir(parents=True, exist_ok=True)
+                        (cg / "cgroup.freeze").write_text("0")
+                        procs = cg / "cgroup.procs"
+                        for p in [pid] + descendants(pid):
+                            try:
+                                procs.write_text(str(p))
+                            except OSError:
+                                pass
+                        self.cgroups[pid] = cg
+                    except OSError:
+                        pass
+
+    def _cleanup_cg(self, pid: int) -> None:
+        cg = self.cgroups.pop(pid, None) or (self.base / f"agent_{pid}" if self.use_cgroup else None)
+        if cg is not None and cg != self.base and cg.exists():
+            try:
+                (cg / "cgroup.freeze").write_text("0")
+                cg.rmdir()
+            except OSError:
+                pass
 
     def unregister(self, pid: int) -> None:
-        self.roots.discard(pid); self.stopped.pop(pid, None)
+        with self.lock:
+            self.roots.discard(pid)
+            self.stopped.pop(pid, None)
+            self._cleanup_cg(pid)
 
     def is_frozen(self, pid: int) -> bool:
         return pid in self.stopped
@@ -117,8 +184,17 @@ class ProcessTreeFreezer:
             if pid not in self.roots:
                 log("FREEZE", f"pid {pid} not a registered agent root: nothing signalled (simulated)")
                 return []
-            if self.use_cgroup:
-                self.ctl.write_text("1")
+            cg = self.cgroups.get(pid, self.base)
+            if self.use_cgroup and (cg / "cgroup.freeze").exists():
+                procs = cg / "cgroup.procs"
+                if cg != self.base:
+                    for p in [pid] + descendants(pid):
+                        try:
+                            procs.write_text(str(p))
+                        except OSError:
+                            pass
+                (cg / "cgroup.freeze").write_text("1")
+                self._wait_frozen(cg, "1")
                 tree = [pid] + descendants(pid)
                 log("RING0", f"cgroup.freeze=1 ({len(tree)} tasks)")
             else:
@@ -141,8 +217,10 @@ class ProcessTreeFreezer:
             tree = self.stopped.pop(pid, [])
             if not tree:
                 return []
-            if self.use_cgroup:
-                self.ctl.write_text("0")
+            cg = self.cgroups.get(pid, self.base)
+            if self.use_cgroup and (cg / "cgroup.freeze").exists():
+                (cg / "cgroup.freeze").write_text("0")
+                self._wait_frozen(cg, "0")
             else:
                 for p in reversed(tree):
                     try:
@@ -161,6 +239,7 @@ class ProcessTreeFreezer:
                 except ProcessLookupError:
                     pass
             self.roots.discard(pid)
+            self._cleanup_cg(pid)
             log("RING0", f"SIGKILL -> {tree}")
 
 
