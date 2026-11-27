@@ -106,7 +106,12 @@ def c_enum(src: str, name: str) -> dict[str, int]:
 
 def kdev(st_dev: int) -> int:
     """User-space st_dev (new_encode_dev) -> kernel dev_t as read from inode->i_sb->s_dev (MKDEV)."""
-    return (os.major(st_dev) << 20) | os.minor(st_dev)
+    try:
+        maj, minr = os.major(st_dev), os.minor(st_dev)
+    except OverflowError:  # CPython < 3.12 on darwin: makedev>=128 is signed int32, major/minor expect uint32
+        u = st_dev & 0xFFFFFFFF
+        maj, minr = os.major(u), os.minor(u)
+    return (maj << 20) | minr
 
 
 def monotonic_ns() -> int:
@@ -230,8 +235,11 @@ class LinuxBpfBackend:
 
 
 def select_backend(pin_dir: Path = DEFAULT_PIN):
-    if sys.platform.startswith("linux") and (pin_dir / "cap_tokens").exists():
-        return LinuxBpfBackend(pin_dir)
+    try:
+        if sys.platform.startswith("linux") and (pin_dir / "cap_tokens").exists():
+            return LinuxBpfBackend(pin_dir)
+    except PermissionError:
+        pass
     return DryRunBackend()
 
 
